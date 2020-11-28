@@ -5,15 +5,30 @@ const bcrypt = require("bcryptjs"); // to encrpyt password
 
 const { check, validationResult } = require("express-validator"); //validation of incoming requests
 const gravatar = require("gravatar"); //get user image by email
-
+const auth = require("../middleware/auth");
 //models
 const User = require("../models/User");
 const { token } = require("morgan");
 
+//@routes POST api/user/
+//@desc User Information
+//@access private
+
+router.get("/", auth, async (req, res) => {
+  try {
+    //get user information by id
+    //.select to exclude password
+    const user = await User.findById(req.user.id).select("-password");
+    res.json(user);
+  } catch (error) {
+    console.log(error.message);
+    res.status(500).send("Internal Server Error");
+  }
+});
+
 //@routes POST api/user/register
 //@desc Register user
 //@access Public
-
 router.post(
   "/register",
   [
@@ -95,4 +110,78 @@ router.post(
   }
 );
 
+//@routes POST api/user/login
+//@desc Login user
+//@access Public
+router.post(
+  "/login",
+  [
+    //validation
+    check("email", "Please include a valid email").isEmail(),
+    check("password", "Please is required").exists(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        errors: errors.array(),
+      });
+    }
+
+    //if every thing is perfect
+    //get email and password from body
+    const { email, password } = req.body;
+
+    try {
+      let user = await User.findOne({ email });
+
+      //User not found in database
+      if (!user) {
+        return res.status(400).json({
+          errors: [
+            {
+              msg: "Invalid Email Credentails",
+            },
+          ],
+        });
+      }
+
+      //user found compare the password
+      const isMatch = await bcrypt.compare(password, user.password);
+
+      //invalid password
+      if (!isMatch) {
+        return res.status(400).json({
+          errors: [
+            {
+              msg: "Invalid Password Credentails",
+            },
+          ],
+        });
+      }
+
+      //payload for jwt
+      const payload = {
+        user: {
+          id: user.id,
+        },
+      };
+
+      jwt.sign(
+        payload,
+        process.env.JWT_SECRET,
+        {
+          expiresIn: 360000,
+        },
+        (err, token) => {
+          if (err) throw err;
+          res.json({ token });
+        }
+      );
+    } catch (error) {
+      console.log(error.message);
+      res.status(500).send("Internal Server Error");
+    }
+  }
+);
 module.exports = router;
