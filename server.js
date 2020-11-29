@@ -17,6 +17,7 @@ connectDb();
 //routes
 app.use("/api/user", require("./routes/auth.routes"));
 app.use("/api/category", require("./routes/category.routes"));
+app.use("/api/product", require("./routes/product.routes"));
 app.get("/", (req, res) => {
   res.send("Hello World!!!!");
 });
