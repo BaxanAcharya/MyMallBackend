@@ -12,7 +12,8 @@ const productSchema = new mongoose.Schema(
     description: {
       type: String,
       required: true,
-      maxlength: 200,
+      maxlength: 1000,
+      minlength: 100,
     },
     price: {
       type: Number,
@@ -33,8 +34,8 @@ const productSchema = new mongoose.Schema(
       default: 0,
     },
     photo: {
-      data: Buffer,
-      contentType: String,
+      type: String,
+      required: true,
     },
     shipping: {
       required: false,

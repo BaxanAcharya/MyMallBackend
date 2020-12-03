@@ -5,107 +5,64 @@ const auth = require("../middleware/auth");
 const productById = require("../middleware/productById");
 const adminAuth = require("../middleware/adminAuth");
 
-const formidable = require("formidable");
-const fs = require("fs");
-
 //@route POST api/product
 //@desc Add a product
 //@access Private admin
-router.post("/", auth, adminAuth, (req, res) => {
-  let form = new formidable.IncomingForm();
-  form.keepExtensions = true;
-  form.parse(req, async (err, fields, files) => {
-    if (err) {
-      return res.status(400).json({
-        error: "Image cannot be uploaded",
-      });
-    }
+router.post("/", auth, adminAuth, async (req, res) => {
+  //check for all fileds
+  const {
+    name,
+    description,
+    price,
+    category,
+    quantity,
+    shipping,
+    photo,
+  } = req.body;
+  if (
+    !name ||
+    !description ||
+    !price ||
+    !category ||
+    !quantity ||
+    !shipping ||
+    !photo
+  ) {
+    return res.status(400).json({
+      error: "All fields are required",
+    });
+  }
 
-    if (!files.photo) {
-      return res.status(400).json({
-        error: "Image is required",
-      });
-    }
-    if (
-      files.photo.type !== "image/jpeg" &&
-      files.photo.type !== "image/jpg" &&
-      files.photo.type !== "image/png"
-    ) {
-      return res.status(400).json({
-        error: "Image type not allowed",
-      });
-    }
+  let product = new Product(req.body);
 
-    //check for all fileds
-    const { name, description, price, category, quantity, shipping } = fields;
-    if (
-      !name ||
-      !description ||
-      !price ||
-      !category ||
-      !quantity ||
-      !shipping
-    ) {
-      return res.status(400).json({
-        error: "All fields are required",
-      });
-    }
-
-    let product = new Product(fields);
-    //1MB=1000000
-    if (files.photo.size > 1000000) {
-      return res.status(400).json({
-        error: "Image should be less than 1 MB",
-      });
-    }
-    product.photo.data = fs.readFileSync(files.photo.path);
-    product.photo.contentType = files.photo.type;
-
-    try {
-      await product.save();
-      res.json("Product Created Successfully");
-    } catch (error) {
-      console.log(error.message);
-      res.status(500).send("Internal Server Error");
-    }
-  });
+  try {
+    await product.save();
+    res.json("Product Created Successfully");
+  } catch (error) {
+    console.log(error.message);
+    res.status(500).send("Internal Server Error");
+  }
 });
 
 //@route GET api/product/:productId
 //@desc get a product
 //@access public
 router.get("/:productId", productById, (req, res) => {
-  req.product.photo = undefined;
   return res.json(req.product);
 });
 
-//@route GET api/product/photo/:productId
-//@desc get a product image
-//@access public
-
-router.get("/photo/:productId", productById, (req, res) => {
-  if (req.product.photo.data) {
-    res.set("Content-Type", req.product.photo.contentType);
-    return res.send(req.product.photo.data);
-  }
-
-  res.status(400).json({
-    error: "Failed to load photo",
-  });
-});
-
-//@route GET api/product/list
+//@route GET api/product
 //@desc get list of product with filter
 //options (order=asc or desc, sortBy any product property like name, limit, number of returned product)
 //@access public
 router.get("/", async (req, res) => {
   let order = req.query ? req.query.order : "asc";
   let sortBy = req.query.sortBy ? req.query.sortBy : "_id";
-  let limit = req.query.limit ? parseInt(req.query.limit) : 6;
+  let limit = req.query.limit && parseInt(req.query.limit);
 
   try {
     let products = await Product.find({})
-      .select("-photo")
+      // .select("-photo")
       .populate("category")
       .sort([[sortBy, order]])
       .limit(limit)
@@ -152,7 +109,8 @@ router.get("/all/search", async (req, res) => {
     }
   }
   try {
-    let products = await Product.find(query).select("-photo");
+    let products = await Product.find(query);
+    // .select("-photo");
     res.json(products);
   } catch (error) {
     console.log(error.message);
